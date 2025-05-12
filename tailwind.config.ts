@@ -26,10 +26,10 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				jelly: {
-					primary: '#9b87f5',
-					secondary: '#7E69AB',
-					dark: '#1A1F2C',
-					accent: '#8B5CF6',
+					primary: '#13294B',
+					secondary: '#1A4177',
+					dark: '#0A1A33',
+					accent: '#1D4D8C',
 				},
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',

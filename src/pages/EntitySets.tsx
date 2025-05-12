@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardHeader from "@/components/DashboardHeader";
+import { PlusCircle, X, FileText, Edit, Trash } from "lucide-react";
 
 interface EntitySet {
   id: string;
@@ -53,6 +54,7 @@ const EntitySets = () => {
   const [entityArray, setEntityArray] = useState("");
   const [entitiesForNewSet, setEntitiesForNewSet] = useState<string[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSet, setEditingSet] = useState<EntitySet | null>(null);
   const { toast } = useToast();
 
   const handleAddEntity = () => {
@@ -108,22 +110,38 @@ const EntitySets = () => {
 
   const handleCreateEntitySet = () => {
     if (newSetName.trim() && entitiesForNewSet.length > 0) {
-      const newSet: EntitySet = {
-        id: `id-${Date.now()}`,
-        name: newSetName.trim(),
-        entities: [...entitiesForNewSet],
-        createdAt: new Date().toISOString(),
-      };
-      
-      setEntitySets([newSet, ...entitySets]);
+      if (editingSet) {
+        // Update existing set
+        const updatedSets = entitySets.map(set => 
+          set.id === editingSet.id 
+            ? { ...set, name: newSetName.trim(), entities: [...entitiesForNewSet] }
+            : set
+        );
+        setEntitySets(updatedSets);
+        setEditingSet(null);
+        toast({
+          title: "Entity Set Updated",
+          description: `"${newSetName}" has been successfully updated with ${entitiesForNewSet.length} entities.`,
+        });
+      } else {
+        // Create new set
+        const newSet: EntitySet = {
+          id: `id-${Date.now()}`,
+          name: newSetName.trim(),
+          entities: [...entitiesForNewSet],
+          createdAt: new Date().toISOString(),
+        };
+        
+        setEntitySets([newSet, ...entitySets]);
+        toast({
+          title: "Entity Set Created",
+          description: `"${newSetName}" has been successfully created with ${entitiesForNewSet.length} entities.`,
+        });
+      }
+      // Reset form
       setNewSetName("");
       setEntitiesForNewSet([]);
       setIsDialogOpen(false);
-      
-      toast({
-        title: "Entity Set Created",
-        description: `"${newSetName}" has been successfully created with ${entitiesForNewSet.length} entities.`,
-      });
     } else {
       toast({
         title: "Validation Error",
@@ -133,12 +151,25 @@ const EntitySets = () => {
     }
   };
 
+  const handleEditEntitySet = (set: EntitySet) => {
+    setEditingSet(set);
+    setNewSetName(set.name);
+    setEntitiesForNewSet([...set.entities]);
+    setIsDialogOpen(true);
+  };
+
   const handleDeleteEntitySet = (id: string) => {
     setEntitySets(entitySets.filter(set => set.id !== id));
     toast({
       title: "Entity Set Deleted",
       description: "The entity set has been removed.",
     });
+  };
+
+  const resetForm = () => {
+    setNewSetName("");
+    setEntitiesForNewSet([]);
+    setEditingSet(null);
   };
 
   return (
@@ -152,27 +183,33 @@ const EntitySets = () => {
             <p className="text-gray-500 text-sm">Create and manage sets of entities for document extraction</p>
           </div>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog 
+            open={isDialogOpen} 
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="bg-jelly-primary hover:bg-jelly-accent">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
+                <PlusCircle className="mr-2 h-4 w-4" />
                 Create Entity Set
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Create New Entity Set</DialogTitle>
+                <DialogTitle>{editingSet ? "Edit Entity Set" : "Create New Entity Set"}</DialogTitle>
                 <DialogDescription>
-                  Define a group of entities that you want to extract from your documents.
+                  {editingSet 
+                    ? "Update your entity extraction set with the fields you want to extract from documents."
+                    : "Define a group of entities that you want to extract from your documents."
+                  }
                 </DialogDescription>
               </DialogHeader>
               
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
+                  <Label htmlFor="name" className="text-right font-medium">
                     Name
                   </Label>
                   <Input
@@ -185,7 +222,7 @@ const EntitySets = () => {
                 </div>
                 
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="entity" className="text-right">
+                  <Label htmlFor="entity" className="text-right font-medium">
                     Add Entity
                   </Label>
                   <div className="col-span-3 flex gap-2">
@@ -202,14 +239,19 @@ const EntitySets = () => {
                         }
                       }}
                     />
-                    <Button type="button" variant="secondary" onClick={handleAddEntity}>
+                    <Button 
+                      type="button" 
+                      variant="secondary"
+                      onClick={handleAddEntity}
+                      className="bg-jelly-secondary text-white hover:bg-jelly-accent"
+                    >
                       Add
                     </Button>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="entityArray" className="text-right">
+                  <Label htmlFor="entityArray" className="text-right font-medium">
                     Add Multiple
                   </Label>
                   <div className="col-span-3 space-y-2">
@@ -218,9 +260,15 @@ const EntitySets = () => {
                       value={entityArray}
                       onChange={e => setEntityArray(e.target.value)}
                       placeholder='["Entity1", "Entity2", "Entity3"] or Entity1, Entity2, Entity3'
-                      className="w-full min-h-[80px] px-3 py-2 text-sm rounded-md border border-input bg-transparent"
+                      className="w-full min-h-[80px] px-3 py-2 text-sm rounded-md border border-input bg-background resize-none"
                     />
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddEntityArray}>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleAddEntityArray}
+                      className="border-jelly-primary text-jelly-primary hover:bg-jelly-primary/10"
+                    >
                       Add Multiple
                     </Button>
                     <p className="text-xs text-gray-500">
@@ -230,26 +278,23 @@ const EntitySets = () => {
                 </div>
                 
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right">
+                  <Label className="text-right font-medium">
                     Entities
                   </Label>
                   <div className="col-span-3">
                     {entitiesForNewSet.length === 0 ? (
                       <p className="text-sm text-gray-500 italic">No entities added yet</p>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-md bg-gray-50">
                         {entitiesForNewSet.map((entity, index) => (
-                          <Badge key={index} variant="secondary" className="px-2 py-1 flex gap-1 items-center">
+                          <Badge key={index} variant="secondary" className="px-2 py-1 flex gap-1 items-center bg-white border border-gray-200">
                             {entity}
                             <button
                               type="button"
                               onClick={() => handleRemoveEntity(entity)}
-                              className="hover:text-red-500"
+                              className="hover:text-red-500 ml-1 focus:outline-none"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                              </svg>
+                              <X size={14} />
                             </button>
                           </Badge>
                         ))}
@@ -260,11 +305,17 @@ const EntitySets = () => {
               </div>
               
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button variant="outline" onClick={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreateEntitySet} className="bg-jelly-primary hover:bg-jelly-accent">
-                  Create Entity Set
+                <Button 
+                  onClick={handleCreateEntitySet} 
+                  className="bg-jelly-primary hover:bg-jelly-accent"
+                >
+                  {editingSet ? "Update Entity Set" : "Create Entity Set"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -273,39 +324,43 @@ const EntitySets = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {entitySets.map(set => (
-            <Card key={set.id} className="border border-gray-200 transition-shadow hover:shadow-md">
-              <CardHeader>
+            <Card key={set.id} className="border border-gray-200 transition-shadow hover:shadow-md overflow-hidden">
+              <CardHeader className="pb-3 bg-gray-50 border-b">
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle>{set.name}</CardTitle>
+                    <CardTitle className="text-jelly-primary">{set.name}</CardTitle>
                     <CardDescription>
                       {new Date(set.createdAt).toLocaleDateString()}
                     </CardDescription>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteEntitySet(set.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleDeleteEntitySet(set.id)} 
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash size={16} />
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 <div className="flex flex-wrap gap-2">
                   {set.entities.map((entity, index) => (
-                    <Badge key={index} variant="secondary" className="px-2 py-1">
+                    <Badge key={index} variant="outline" className="px-2 py-1 border-jelly-primary/30 bg-jelly-primary/5 text-jelly-primary">
                       {entity}
                     </Badge>
                   ))}
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between border-t pt-4">
+              <CardFooter className="flex justify-between border-t pt-4 bg-gray-50">
                 <span className="text-sm text-gray-500">{set.entities.length} entities</span>
-                <Button variant="outline" size="sm">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                  </svg>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleEditEntitySet(set)}
+                  className="border-jelly-primary text-jelly-primary hover:bg-jelly-primary/10"
+                >
+                  <Edit size={16} className="mr-2" />
                   Edit
                 </Button>
               </CardFooter>
@@ -316,18 +371,16 @@ const EntitySets = () => {
         {entitySets.length === 0 && (
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
             <div className="mx-auto w-16 h-16 rounded-full bg-jelly-primary/10 flex items-center justify-center mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-jelly-primary">
-                <rect x="3" y="3" width="7" height="7"></rect>
-                <rect x="14" y="3" width="7" height="7"></rect>
-                <rect x="14" y="14" width="7" height="7"></rect>
-                <rect x="3" y="14" width="7" height="7"></rect>
-              </svg>
+              <FileText className="text-jelly-primary" size={24} />
             </div>
             <h3 className="text-lg font-semibold mb-2">No Entity Sets Yet</h3>
             <p className="text-gray-500 mb-4">
               Create your first entity set to start extracting information from your documents.
             </p>
-            <Button onClick={() => setIsDialogOpen(true)} className="bg-jelly-primary hover:bg-jelly-accent">
+            <Button 
+              onClick={() => setIsDialogOpen(true)} 
+              className="bg-jelly-primary hover:bg-jelly-accent"
+            >
               Create Your First Entity Set
             </Button>
           </div>
