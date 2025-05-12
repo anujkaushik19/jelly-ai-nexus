@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardHeader from "@/components/DashboardHeader";
-import { PlusCircle, X, FileText, Edit, Trash } from "lucide-react";
+import { PlusCircle, X, FileText, Edit, Trash, Loader2 } from "lucide-react";
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, Timestamp, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface EntitySet {
   id: string;
@@ -25,37 +27,52 @@ interface EntitySet {
   createdAt: string;
 }
 
-// Mock data - would be replaced by Firebase in the real implementation
-const mockEntitySets: EntitySet[] = [
-  {
-    id: "1",
-    name: "Insurance Policy Details",
-    entities: ["Policy Number", "Effective Date", "Expiration Date", "Premium", "Coverage Limit"],
-    createdAt: "2023-05-15T10:30:00Z",
-  },
-  {
-    id: "2",
-    name: "Client Information",
-    entities: ["Full Name", "Email", "Phone", "Address", "Date of Birth"],
-    createdAt: "2023-06-22T14:45:00Z",
-  },
-  {
-    id: "3",
-    name: "Claim Details",
-    entities: ["Claim Number", "Date of Loss", "Type of Loss", "Amount Claimed", "Status"],
-    createdAt: "2023-07-10T09:15:00Z",
-  },
-];
-
 const EntitySets = () => {
-  const [entitySets, setEntitySets] = useState<EntitySet[]>(mockEntitySets);
+  const [entitySets, setEntitySets] = useState<EntitySet[]>([]);
   const [newSetName, setNewSetName] = useState("");
   const [newEntity, setNewEntity] = useState("");
   const [entityArray, setEntityArray] = useState("");
   const [entitiesForNewSet, setEntitiesForNewSet] = useState<string[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<EntitySet | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Fetch entity sets from Firestore
+  useEffect(() => {
+    const fetchEntitySets = async () => {
+      try {
+        setIsLoading(true);
+        const entitySetsQuery = query(collection(db, "entitySets"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(entitySetsQuery);
+        
+        const fetchedSets: EntitySet[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          fetchedSets.push({
+            id: doc.id,
+            name: data.name,
+            entities: data.entities,
+            createdAt: data.createdAt.toDate().toISOString()
+          });
+        });
+        
+        setEntitySets(fetchedSets);
+      } catch (error) {
+        console.error("Error fetching entity sets:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch entity sets. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEntitySets();
+  }, [toast]);
 
   const handleAddEntity = () => {
     if (newEntity.trim() && !entitiesForNewSet.includes(newEntity.trim())) {
@@ -108,40 +125,77 @@ const EntitySets = () => {
     setEntitiesForNewSet(entitiesForNewSet.filter(entity => entity !== entityToRemove));
   };
 
-  const handleCreateEntitySet = () => {
+  const handleCreateEntitySet = async () => {
     if (newSetName.trim() && entitiesForNewSet.length > 0) {
-      if (editingSet) {
-        // Update existing set
-        const updatedSets = entitySets.map(set => 
-          set.id === editingSet.id 
-            ? { ...set, name: newSetName.trim(), entities: [...entitiesForNewSet] }
-            : set
-        );
-        setEntitySets(updatedSets);
-        setEditingSet(null);
-        toast({
-          title: "Entity Set Updated",
-          description: `"${newSetName}" has been successfully updated with ${entitiesForNewSet.length} entities.`,
-        });
-      } else {
-        // Create new set
-        const newSet: EntitySet = {
-          id: `id-${Date.now()}`,
-          name: newSetName.trim(),
-          entities: [...entitiesForNewSet],
-          createdAt: new Date().toISOString(),
-        };
+      try {
+        setIsSaving(true);
         
-        setEntitySets([newSet, ...entitySets]);
+        if (editingSet) {
+          // Update existing set in Firestore
+          const entitySetRef = doc(db, "entitySets", editingSet.id);
+          await updateDoc(entitySetRef, {
+            name: newSetName.trim(),
+            entities: entitiesForNewSet,
+            updatedAt: Timestamp.now(),
+          });
+          
+          // Update local state
+          const updatedSets = entitySets.map(set => 
+            set.id === editingSet.id 
+              ? { 
+                  ...set, 
+                  name: newSetName.trim(), 
+                  entities: [...entitiesForNewSet],
+                }
+              : set
+          );
+          setEntitySets(updatedSets);
+          
+          toast({
+            title: "Entity Set Updated",
+            description: `"${newSetName}" has been successfully updated with ${entitiesForNewSet.length} entities.`,
+          });
+        } else {
+          // Create new set in Firestore
+          const newEntitySet = {
+            name: newSetName.trim(),
+            entities: entitiesForNewSet,
+            createdAt: Timestamp.now(),
+          };
+          
+          const docRef = await addDoc(collection(db, "entitySets"), newEntitySet);
+          
+          // Add to local state
+          const createdSet: EntitySet = {
+            id: docRef.id,
+            name: newSetName.trim(),
+            entities: [...entitiesForNewSet],
+            createdAt: new Date().toISOString(),
+          };
+          
+          setEntitySets([createdSet, ...entitySets]);
+          
+          toast({
+            title: "Entity Set Created",
+            description: `"${newSetName}" has been successfully created with ${entitiesForNewSet.length} entities.`,
+          });
+        }
+        
+        // Reset form
+        setNewSetName("");
+        setEntitiesForNewSet([]);
+        setIsDialogOpen(false);
+        setEditingSet(null);
+      } catch (error) {
+        console.error("Error saving entity set:", error);
         toast({
-          title: "Entity Set Created",
-          description: `"${newSetName}" has been successfully created with ${entitiesForNewSet.length} entities.`,
+          title: "Error",
+          description: "Failed to save entity set. Please try again.",
+          variant: "destructive",
         });
+      } finally {
+        setIsSaving(false);
       }
-      // Reset form
-      setNewSetName("");
-      setEntitiesForNewSet([]);
-      setIsDialogOpen(false);
     } else {
       toast({
         title: "Validation Error",
@@ -158,12 +212,22 @@ const EntitySets = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteEntitySet = (id: string) => {
-    setEntitySets(entitySets.filter(set => set.id !== id));
-    toast({
-      title: "Entity Set Deleted",
-      description: "The entity set has been removed.",
-    });
+  const handleDeleteEntitySet = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "entitySets", id));
+      setEntitySets(entitySets.filter(set => set.id !== id));
+      toast({
+        title: "Entity Set Deleted",
+        description: "The entity set has been removed.",
+      });
+    } catch (error) {
+      console.error("Error deleting entity set:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete entity set. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const resetForm = () => {
@@ -191,7 +255,7 @@ const EntitySets = () => {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="bg-jelly-primary hover:bg-jelly-accent">
+              <Button className="bg-[#13294B] hover:bg-[#1e3a68]">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Create Entity Set
               </Button>
@@ -243,7 +307,7 @@ const EntitySets = () => {
                       type="button" 
                       variant="secondary"
                       onClick={handleAddEntity}
-                      className="bg-jelly-secondary text-white hover:bg-jelly-accent"
+                      className="bg-[#13294B] text-white hover:bg-[#1e3a68]"
                     >
                       Add
                     </Button>
@@ -267,7 +331,7 @@ const EntitySets = () => {
                       variant="outline" 
                       size="sm" 
                       onClick={handleAddEntityArray}
-                      className="border-jelly-primary text-jelly-primary hover:bg-jelly-primary/10"
+                      className="border-[#13294B] text-[#13294B] hover:bg-[#13294B]/10"
                     >
                       Add Multiple
                     </Button>
@@ -313,77 +377,94 @@ const EntitySets = () => {
                 </Button>
                 <Button 
                   onClick={handleCreateEntitySet} 
-                  className="bg-jelly-primary hover:bg-jelly-accent"
+                  className="bg-[#13294B] hover:bg-[#1e3a68]"
+                  disabled={isSaving}
                 >
-                  {editingSet ? "Update Entity Set" : "Create Entity Set"}
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {editingSet ? "Updating..." : "Creating..."}
+                    </>
+                  ) : (
+                    editingSet ? "Update Entity Set" : "Create Entity Set"
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {entitySets.map(set => (
-            <Card key={set.id} className="border border-gray-200 transition-shadow hover:shadow-md overflow-hidden">
-              <CardHeader className="pb-3 bg-gray-50 border-b">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-jelly-primary">{set.name}</CardTitle>
-                    <CardDescription>
-                      {new Date(set.createdAt).toLocaleDateString()}
-                    </CardDescription>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleDeleteEntitySet(set.id)} 
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash size={16} />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="flex flex-wrap gap-2">
-                  {set.entities.map((entity, index) => (
-                    <Badge key={index} variant="outline" className="px-2 py-1 border-jelly-primary/30 bg-jelly-primary/5 text-jelly-primary">
-                      {entity}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between border-t pt-4 bg-gray-50">
-                <span className="text-sm text-gray-500">{set.entities.length} entities</span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => handleEditEntitySet(set)}
-                  className="border-jelly-primary text-jelly-primary hover:bg-jelly-primary/10"
-                >
-                  <Edit size={16} className="mr-2" />
-                  Edit
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-        
-        {entitySets.length === 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-jelly-primary/10 flex items-center justify-center mb-4">
-              <FileText className="text-jelly-primary" size={24} />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">No Entity Sets Yet</h3>
-            <p className="text-gray-500 mb-4">
-              Create your first entity set to start extracting information from your documents.
-            </p>
-            <Button 
-              onClick={() => setIsDialogOpen(true)} 
-              className="bg-jelly-primary hover:bg-jelly-accent"
-            >
-              Create Your First Entity Set
-            </Button>
+        {isLoading ? (
+          <div className="flex justify-center items-center p-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[#13294B]" />
+            <span className="ml-2 text-lg text-[#13294B]">Loading entity sets...</span>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {entitySets.map(set => (
+                <Card key={set.id} className="border border-gray-200 transition-shadow hover:shadow-md overflow-hidden">
+                  <CardHeader className="pb-3 bg-gray-50 border-b">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-[#13294B]">{set.name}</CardTitle>
+                        <CardDescription>
+                          {new Date(set.createdAt).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteEntitySet(set.id)} 
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash size={16} />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="flex flex-wrap gap-2">
+                      {set.entities.map((entity, index) => (
+                        <Badge key={index} variant="outline" className="px-2 py-1 border-[#13294B]/30 bg-[#13294B]/5 text-[#13294B]">
+                          {entity}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex justify-between border-t pt-4 bg-gray-50">
+                    <span className="text-sm text-gray-500">{set.entities.length} entities</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleEditEntitySet(set)}
+                      className="border-[#13294B] text-[#13294B] hover:bg-[#13294B]/10"
+                    >
+                      <Edit size={16} className="mr-2" />
+                      Edit
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+            
+            {entitySets.length === 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                <div className="mx-auto w-16 h-16 rounded-full bg-[#13294B]/10 flex items-center justify-center mb-4">
+                  <FileText className="text-[#13294B]" size={24} />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">No Entity Sets Yet</h3>
+                <p className="text-gray-500 mb-4">
+                  Create your first entity set to start extracting information from your documents.
+                </p>
+                <Button 
+                  onClick={() => setIsDialogOpen(true)} 
+                  className="bg-[#13294B] hover:bg-[#1e3a68]"
+                >
+                  Create Your First Entity Set
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
