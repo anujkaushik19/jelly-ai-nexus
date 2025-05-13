@@ -93,7 +93,7 @@ const NewTraining = () => {
   const handleConfigSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation
+
     const requiredFields = Object.entries(formData);
     const emptyFields = requiredFields.filter(([_, value]) => !value);
     
@@ -108,7 +108,7 @@ const NewTraining = () => {
     
     setIsLoading(true);
     
-    // Simulating API call
+   
     setTimeout(() => {
       setIsLoading(false);
       setIsConfigSubmitted(true);

@@ -33,7 +33,7 @@ const Features = () => {
     <section id="features" className="py-16 md:py-24 bg-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 reveal">How can Jelly Help You?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 reveal">How can I Help You?</h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto reveal" style={{ transitionDelay: "0.2s" }}>
             Our AI-powered document intelligence platform streamlines document processing workflows for insurance companies and general contractors.
           </p>

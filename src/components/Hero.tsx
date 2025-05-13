@@ -37,7 +37,7 @@ const Hero = () => {
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-16">
           <div className="w-full md:w-1/2">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 reveal">
-              Welcome to <span className="gradient-text">JELLY</span> Document Intelligence
+              Welcome to <span className="gradient-text">DOC-AI</span> Document Intelligence
             </h1>
             <p className="text-lg md:text-xl text-gray-600 mb-8 reveal" style={{ transitionDelay: "0.2s" }}>
               Transform your document processing workflow with AI-powered entity extraction for insurance firms and general contractors.
@@ -59,27 +59,8 @@ const Hero = () => {
               <p className="text-sm text-gray-600">Trusted by industry leaders</p>
             </div>
           </div>
-          <div className="w-full md:w-1/2 relative reveal" style={{ transitionDelay: "0.3s" }}>
-            <div className="bg-gradient-to-br from-jelly-primary/20 to-jelly-accent/20 rounded-lg p-1">
-              <div className="bg-white rounded-lg shadow-lg p-4">
-                <div className="bg-gray-100 rounded-md h-64 md:h-80 flex items-center justify-center">
-                  <div className="animate-float relative">
-                    <div className="w-32 h-40 bg-white rounded-md shadow-md absolute -top-12 -left-16 rotate-12 flex items-center justify-center">
-                      <div className="w-24 h-32 bg-gray-200 rounded"></div>
-                    </div>
-                    <div className="w-40 h-48 bg-white rounded-md shadow-md z-10 relative flex flex-col p-3">
-                      <div className="flex-1 bg-gray-200 rounded-sm mb-2"></div>
-                      <div className="h-4 bg-jelly-primary/30 rounded-sm w-3/4"></div>
-                    </div>
-                    <div className="w-32 h-40 bg-white rounded-md shadow-md absolute -bottom-12 -right-16 -rotate-12 flex items-center justify-center">
-                      <div className="w-24 h-32 bg-gray-200 rounded"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="absolute -top-4 -right-4 w-20 h-20 bg-jelly-accent/10 rounded-full"></div>
-            <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-jelly-primary/10 rounded-full"></div>
+          <div className="w-full md:w-1/2 relative reveal " style={{ transitionDelay: "0.3s" }}>
+            <img src="https://d3lkc3n5th01x7.cloudfront.net/wp-content/uploads/2023/05/25055959/Intelligent-Document-Processing-IDP-Banner.svg" alt="" />
           </div>
         </div>
       </div>
