@@ -32,9 +32,9 @@ const Navbar = () => {
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-jelly-primary to-jelly-accent flex items-center justify-center text-white font-bold">
-            J
+            D
           </div>
-          <span className="font-bold text-xl text-jelly-dark">JELLY</span>
+          <span className="font-bold text-xl text-jelly-dark">DOC-AI</span>
         </Link>
         
         <nav className="hidden md:flex items-center gap-8">
