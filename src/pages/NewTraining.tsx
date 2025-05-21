@@ -1,18 +1,17 @@
-
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
-import DashboardHeader from "@/components/DashboardHeader";
+} from '@/components/ui/select';
+import { useToast } from '@/components/ui/use-toast';
+import DashboardHeader from '@/components/DashboardHeader';
 import {
   Card,
   CardContent,
@@ -20,14 +19,20 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Upload, FileText, Shield, Database, Server, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+  Upload,
+  FileText,
+  Shield,
+  Database,
+  Server,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+} from 'lucide-react';
+import { db } from '../Firebase.js';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface EntitySet {
   id: string;
@@ -35,131 +40,215 @@ interface EntitySet {
   entities: string[];
 }
 
-// Mock data - would be replaced by Firebase fetch in real implementation
 const mockEntitySets: EntitySet[] = [
   {
-    id: "1",
-    name: "Insurance Policy Details",
-    entities: ["Policy Number", "Effective Date", "Expiration Date", "Premium", "Coverage Limit"],
+    id: '1',
+    name: 'Insurance Policy Details',
+    entities: [
+      'Policy Number',
+      'Effective Date',
+      'Expiration Date',
+      'Premium',
+      'Coverage Limit',
+    ],
   },
   {
-    id: "2",
-    name: "Client Information",
-    entities: ["Full Name", "Email", "Phone", "Address", "Date of Birth"],
+    id: '2',
+    name: 'Client Information',
+    entities: ['Full Name', 'Email', 'Phone', 'Address', 'Date of Birth'],
   },
   {
-    id: "3",
-    name: "Claim Details",
-    entities: ["Claim Number", "Date of Loss", "Type of Loss", "Amount Claimed", "Status"],
+    id: '3',
+    name: 'Claim Details',
+    entities: [
+      'Claim Number',
+      'Date of Loss',
+      'Type of Loss',
+      'Amount Claimed',
+      'Status',
+    ],
   },
 ];
 
 const NewTraining = () => {
-  const [activeTab, setActiveTab] = useState("config");
+  const [activeTab, setActiveTab] = useState('config');
   const [formData, setFormData] = useState({
-    domainName: "",
-    awsAccessKey: "",
-    awsSecret: "",
-    bucketName: "",
-    region: "",
-    entitySetId: "",
+    domainName: '',
+    awsAccessKey: '',
+    awsSecret: '',
+    bucketName: '',
+    region: '',
+    entitySetId: '',
   });
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigSubmitted, setIsConfigSubmitted] = useState(false);
+  const [entitySets, setEntitySets] = useState<EntitySet[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      setUploadedFiles(prev => [...prev, ...filesArray]);
+      setUploadedFiles((prev) => [...prev, ...filesArray]);
     }
   };
 
   const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleConfigSubmit = (e: React.FormEvent) => {
+  const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
 
     const requiredFields = Object.entries(formData);
+    console.log('required fields are', requiredFields);
     const emptyFields = requiredFields.filter(([_, value]) => !value);
-    
+
     if (emptyFields.length > 0) {
       toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
+        title: 'Validation Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     setIsLoading(true);
-    
-   
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsConfigSubmitted(true);
-      setActiveTab("upload");
-      
-      toast({
-        title: "Configuration Saved",
-        description: "Your training configuration has been saved successfully.",
+
+    const entitySetId = formData.entitySetId;
+
+    const selectedSet = entitySets.find((set) => set.id === entitySetId);
+    const entities = selectedSet.entities;
+
+    const payload = {
+      aws_region: formData.region,
+      aws_access_key_id: formData.awsAccessKey,
+      aws_secret_access_key: formData.awsSecret,
+      s3_bucket_name: formData.bucketName,
+      entities: entities,
+      domain: formData.domainName,
+    };
+
+    const bucketName = formData?.bucketName;
+    localStorage.setItem('bucketName', bucketName);
+
+    console.log('payload is', formData.bucketName);
+
+    try {
+      const response = await fetch('http://192.168.0.250:8080/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
-    }, 1500);
+
+      const data = await response.json();
+      const files = data.files;
+
+      if (!response.ok) {
+        throw new Error(`API responded with status ${response.status}`);
+      }
+
+      console.log('process response is', data);
+
+      // If the API call was successful
+      setIsConfigSubmitted(true);
+      setActiveTab('upload');
+
+      toast({
+        title: 'Configuration Saved',
+        description: 'Your training configuration has been saved successfully.',
+      });
+
+      navigate('/dashboard/trained', {
+        state: { files: files },
+      });
+    } catch (error) {
+      console.error('API Error:', error);
+      toast({
+        title: 'API Error',
+        description: 'There was a problem saving the configuration.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleTrainingSubmit = () => {
     if (uploadedFiles.length === 0) {
       toast({
-        title: "No Documents",
-        description: "Please upload at least one document to process.",
-        variant: "destructive",
+        title: 'No Documents',
+        description: 'Please upload at least one document to process.',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     // Simulating API call for document processing
     setTimeout(() => {
       setIsLoading(false);
       toast({
-        title: "Training Initiated",
-        description: `Processing ${uploadedFiles.length} document${uploadedFiles.length > 1 ? 's' : ''}.`,
+        title: 'Training Initiated',
+        description: `Processing ${uploadedFiles.length} document${
+          uploadedFiles.length > 1 ? 's' : ''
+        }.`,
       });
-      
+
       // Navigate to training results page
-      navigate("/dashboard/training-results", { 
-        state: { 
+      navigate('/dashboard/training-results', {
+        state: {
           trainingId: `train-${Date.now()}`,
-          files: uploadedFiles.map(file => file.name)
-        } 
+          files: uploadedFiles.map((file) => file.name),
+        },
       });
     }, 2000);
   };
 
   const getSelectedEntitySetName = () => {
-    const set = mockEntitySets.find(set => set.id === formData.entitySetId);
-    return set ? set.name : "Not selected";
+    const set = mockEntitySets.find((set) => set.id === formData.entitySetId);
+    return set ? set.name : 'Not selected';
   };
+
+  useEffect(() => {
+    const fetchEntitySets = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'entitySets'));
+        const fetchedEntitySets: EntitySet[] = querySnapshot.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...(doc.data() as Omit<EntitySet, 'id'>),
+          })
+        );
+        setEntitySets(fetchedEntitySets);
+      } catch (error) {
+        console.error('Error fetching entitySets:', error);
+      }
+    };
+
+    fetchEntitySets();
+  }, []);
 
   return (
     <div className="min-h-full bg-gray-50">
-      <DashboardHeader title="New Training" subtitle="Configure and start a new document training" />
-      
+      <DashboardHeader
+        title="New Training"
+        subtitle="Configure and start a new document training"
+      />
+
       <div className="p-6">
         <Card className="max-w-4xl mx-auto shadow-sm">
           <CardHeader className="bg-jelly-primary text-white">
@@ -168,17 +257,29 @@ const NewTraining = () => {
               Follow the steps below to set up and start your document training
             </CardDescription>
           </CardHeader>
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="w-full grid grid-cols-2">
-              <TabsTrigger value="config" disabled={isLoading} className="data-[state=active]:bg-jelly-primary/10 data-[state=active]:text-jelly-primary">
+              <TabsTrigger
+                value="config"
+                disabled={isLoading}
+                className="data-[state=active]:bg-jelly-primary/10 data-[state=active]:text-jelly-primary"
+              >
                 1. Configure Connection
               </TabsTrigger>
-              <TabsTrigger value="upload" disabled={!isConfigSubmitted || isLoading} className="data-[state=active]:bg-jelly-primary/10 data-[state=active]:text-jelly-primary">
+              <TabsTrigger
+                value="upload"
+                disabled={!isConfigSubmitted || isLoading}
+                className="data-[state=active]:bg-jelly-primary/10 data-[state=active]:text-jelly-primary"
+              >
                 2. Upload Documents
               </TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="config">
               <CardContent className="pt-6">
                 <form onSubmit={handleConfigSubmit}>
@@ -188,17 +289,22 @@ const NewTraining = () => {
                         <Shield size={20} />
                       </div>
                       <div>
-                        <h4 className="font-medium text-blue-800 mb-1">Configuration Settings</h4>
+                        <h4 className="font-medium text-blue-800 mb-1">
+                          Configuration Settings
+                        </h4>
                         <p className="text-sm text-blue-700">
-                          Enter your domain details and AWS credentials to connect to your document storage.
-                          All credentials are securely encrypted.
+                          Enter your domain details and AWS credentials to
+                          connect to your document storage. All credentials are
+                          securely encrypted.
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="domainName" className="font-medium">Domain Name</Label>
+                        <Label htmlFor="domainName" className="font-medium">
+                          Domain Name
+                        </Label>
                         <Input
                           id="domainName"
                           name="domainName"
@@ -211,18 +317,22 @@ const NewTraining = () => {
                           A unique identifier for this training domain
                         </p>
                       </div>
-                      
+
                       <div className="space-y-2">
-                        <Label htmlFor="entitySet" className="font-medium">Entity Set</Label>
-                        <Select 
-                          value={formData.entitySetId} 
-                          onValueChange={(value) => handleSelectChange("entitySetId", value)}
+                        <Label htmlFor="entitySet" className="font-medium">
+                          Entity Set
+                        </Label>
+                        <Select
+                          value={formData.entitySetId}
+                          onValueChange={(value) =>
+                            handleSelectChange('entitySetId', value)
+                          }
                         >
                           <SelectTrigger className="border-gray-300">
                             <SelectValue placeholder="Select entity set" />
                           </SelectTrigger>
                           <SelectContent>
-                            {mockEntitySets.map(set => (
+                            {entitySets?.map((set) => (
                               <SelectItem key={set.id} value={set.id}>
                                 {set.name}
                               </SelectItem>
@@ -234,7 +344,7 @@ const NewTraining = () => {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="border-t border-gray-200 pt-6">
                       <div className="flex items-center gap-2 mb-4">
                         <Database size={18} className="text-jelly-primary" />
@@ -242,7 +352,9 @@ const NewTraining = () => {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label htmlFor="awsAccessKey" className="font-medium">AWS Access Key</Label>
+                          <Label htmlFor="awsAccessKey" className="font-medium">
+                            AWS Access Key
+                          </Label>
                           <Input
                             id="awsAccessKey"
                             name="awsAccessKey"
@@ -253,9 +365,11 @@ const NewTraining = () => {
                             className="border-gray-300"
                           />
                         </div>
-                        
+
                         <div className="space-y-2">
-                          <Label htmlFor="awsSecret" className="font-medium">AWS Secret</Label>
+                          <Label htmlFor="awsSecret" className="font-medium">
+                            AWS Secret
+                          </Label>
                           <Input
                             id="awsSecret"
                             name="awsSecret"
@@ -266,9 +380,11 @@ const NewTraining = () => {
                             className="border-gray-300"
                           />
                         </div>
-                        
+
                         <div className="space-y-2">
-                          <Label htmlFor="bucketName" className="font-medium">Bucket Name</Label>
+                          <Label htmlFor="bucketName" className="font-medium">
+                            Bucket Name
+                          </Label>
                           <Input
                             id="bucketName"
                             name="bucketName"
@@ -278,54 +394,76 @@ const NewTraining = () => {
                             className="border-gray-300"
                           />
                         </div>
-                        
+
                         <div className="space-y-2">
-                          <Label htmlFor="region" className="font-medium">AWS Region</Label>
-                          <Select 
-                            value={formData.region} 
-                            onValueChange={(value) => handleSelectChange("region", value)}
+                          <Label htmlFor="region" className="font-medium">
+                            AWS Region
+                          </Label>
+                          <Select
+                            value={formData.region}
+                            onValueChange={(value) =>
+                              handleSelectChange('region', value)
+                            }
                           >
                             <SelectTrigger className="border-gray-300">
                               <SelectValue placeholder="Select region" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="us-east-1">US East (N. Virginia)</SelectItem>
-                              <SelectItem value="us-east-2">US East (Ohio)</SelectItem>
-                              <SelectItem value="us-west-1">US West (N. California)</SelectItem>
-                              <SelectItem value="us-west-2">US West (Oregon)</SelectItem>
-                              <SelectItem value="eu-west-1">EU West (Ireland)</SelectItem>
-                              <SelectItem value="eu-central-1">EU Central (Frankfurt)</SelectItem>
-                              <SelectItem value="ap-south-1">Asia Pacific (Mumbai)</SelectItem>
-                              <SelectItem value="ap-southeast-1">Asia Pacific (Singapore)</SelectItem>
+                              <SelectItem value="us-east-1">
+                                US East (N. Virginia)
+                              </SelectItem>
+                              <SelectItem value="us-east-2">
+                                US East (Ohio)
+                              </SelectItem>
+                              <SelectItem value="us-west-1">
+                                US West (N. California)
+                              </SelectItem>
+                              <SelectItem value="us-west-2">
+                                US West (Oregon)
+                              </SelectItem>
+                              <SelectItem value="eu-west-1">
+                                EU West (Ireland)
+                              </SelectItem>
+                              <SelectItem value="eu-central-1">
+                                EU Central (Frankfurt)
+                              </SelectItem>
+                              <SelectItem value="ap-south-1">
+                                Asia Pacific (Mumbai)
+                              </SelectItem>
+                              <SelectItem value="ap-southeast-1">
+                                Asia Pacific (Singapore)
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
                     </div>
                   </div>
-                
+
                   <CardFooter className="flex justify-end pt-6 px-0 mt-6 border-t">
                     <div className="flex gap-3">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => navigate("/dashboard/entity-sets")}
+                        onClick={() => navigate('/dashboard/entity-sets')}
                       >
                         Cancel
                       </Button>
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         className="bg-jelly-primary hover:bg-jelly-accent"
                         disabled={isLoading}
                       >
-                        {isLoading ? "Saving Configuration..." : "Save & Continue"}
+                        {isLoading
+                          ? 'Saving Configuration...'
+                          : 'Save & Continue'}
                       </Button>
                     </div>
                   </CardFooter>
                 </form>
               </CardContent>
             </TabsContent>
-            
+
             <TabsContent value="upload">
               <CardContent className="pt-6">
                 <div className="space-y-6">
@@ -334,39 +472,49 @@ const NewTraining = () => {
                       <CheckCircle size={20} />
                     </div>
                     <div>
-                      <h4 className="font-medium text-green-800 mb-1">Configuration Completed</h4>
+                      <h4 className="font-medium text-green-800 mb-1">
+                        Configuration Completed
+                      </h4>
                       <p className="text-sm text-green-700">
-                        Your training configuration has been saved. Now upload documents to process.
+                        Your training configuration has been saved. Now upload
+                        documents to process.
                       </p>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-green-800">
                         <div>
-                          <span className="font-medium">Domain:</span> {formData.domainName}
+                          <span className="font-medium">Domain:</span>{' '}
+                          {formData.domainName}
                         </div>
                         <div>
-                          <span className="font-medium">Entity Set:</span> {getSelectedEntitySetName()}
+                          <span className="font-medium">Entity Set:</span>{' '}
+                          {getSelectedEntitySetName()}
                         </div>
                         <div>
-                          <span className="font-medium">Bucket:</span> {formData.bucketName}
+                          <span className="font-medium">Bucket:</span>{' '}
+                          {formData.bucketName}
                         </div>
                         <div>
-                          <span className="font-medium">Region:</span> {formData.region}
+                          <span className="font-medium">Region:</span>{' '}
+                          {formData.region}
                         </div>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                     <div className="mx-auto w-16 h-16 rounded-full bg-jelly-primary/10 flex items-center justify-center mb-4">
                       <Upload className="h-8 w-8 text-jelly-primary" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">Upload Documents</h3>
+                    <h3 className="text-lg font-semibold mb-2">
+                      Upload Documents
+                    </h3>
                     <p className="text-gray-500 mb-4 max-w-md mx-auto">
-                      Upload PDF documents that you want to process with the selected entity set.
-                      You can upload multiple documents at once.
+                      Upload PDF documents that you want to process with the
+                      selected entity set. You can upload multiple documents at
+                      once.
                     </p>
                     <div className="flex justify-center">
-                      <Label 
-                        htmlFor="document-upload" 
+                      <Label
+                        htmlFor="document-upload"
                         className="cursor-pointer bg-jelly-primary text-white py-2 px-4 rounded-md hover:bg-jelly-accent transition-colors flex items-center gap-2"
                       >
                         <FileText size={18} />
@@ -385,7 +533,7 @@ const NewTraining = () => {
                       Supported formats: PDF
                     </p>
                   </div>
-                  
+
                   {uploadedFiles.length > 0 && (
                     <div>
                       <h4 className="font-medium mb-3 flex items-center gap-2">
@@ -397,9 +545,15 @@ const NewTraining = () => {
                           <table className="w-full">
                             <thead className="bg-gray-50 text-left">
                               <tr>
-                                <th className="px-4 py-3 text-sm font-medium text-gray-500">File Name</th>
-                                <th className="px-4 py-3 text-sm font-medium text-gray-500">Size</th>
-                                <th className="px-4 py-3 text-sm font-medium text-gray-500">Type</th>
+                                <th className="px-4 py-3 text-sm font-medium text-gray-500">
+                                  File Name
+                                </th>
+                                <th className="px-4 py-3 text-sm font-medium text-gray-500">
+                                  Size
+                                </th>
+                                <th className="px-4 py-3 text-sm font-medium text-gray-500">
+                                  Type
+                                </th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500 w-10"></th>
                               </tr>
                             </thead>
@@ -407,19 +561,22 @@ const NewTraining = () => {
                               {uploadedFiles.map((file, index) => (
                                 <tr key={index} className="bg-white">
                                   <td className="px-4 py-2 text-sm text-gray-900 flex items-center gap-2">
-                                    <FileText size={16} className="text-jelly-primary" />
+                                    <FileText
+                                      size={16}
+                                      className="text-jelly-primary"
+                                    />
                                     {file.name}
                                   </td>
                                   <td className="px-4 py-2 text-sm text-gray-500">
                                     {(file.size / 1024).toFixed(1)} KB
                                   </td>
                                   <td className="px-4 py-2 text-sm text-gray-500">
-                                    {file.type || "application/pdf"}
+                                    {file.type || 'application/pdf'}
                                   </td>
                                   <td className="px-4 py-2 text-sm">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
                                       onClick={() => removeFile(index)}
                                       className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                     >
@@ -434,33 +591,36 @@ const NewTraining = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-lg flex items-start gap-3">
                     <div className="text-yellow-600 mt-0.5">
                       <AlertCircle size={20} />
                     </div>
                     <div className="text-sm text-yellow-700">
-                      <p>The document processing time depends on the number and size of the documents. 
-                      Once submitted, you'll be able to monitor the progress on the results page.</p>
+                      <p>
+                        The document processing time depends on the number and
+                        size of the documents. Once submitted, you'll be able to
+                        monitor the progress on the results page.
+                      </p>
                     </div>
                   </div>
                 </div>
-              
+
                 <CardFooter className="flex justify-end pt-6 px-0 mt-6 border-t">
                   <div className="flex gap-3">
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setActiveTab("config")}
+                      onClick={() => setActiveTab('config')}
                     >
                       Back to Configuration
                     </Button>
-                    <Button 
-                      onClick={handleTrainingSubmit} 
+                    <Button
+                      onClick={handleTrainingSubmit}
                       className="bg-jelly-primary hover:bg-jelly-accent"
                       disabled={isLoading || uploadedFiles.length === 0}
                     >
-                      {isLoading ? "Processing..." : "Start Training"}
+                      {isLoading ? 'Processing...' : 'Start Training'}
                     </Button>
                   </div>
                 </CardFooter>

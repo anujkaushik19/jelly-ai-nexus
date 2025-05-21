@@ -12,6 +12,7 @@ import TrainingResults from "./pages/TrainingResults";
 import DocumentView from "./pages/DocumentView";
 import PastTrainings from "./pages/PastTrainings";
 import NotFound from "./pages/NotFound";
+import Trained from "./pages/Trained";
 
 const queryClient = new QueryClient();
 
@@ -31,8 +32,12 @@ const App = () => (
             <Route path="training-results" element={<TrainingResults />} />
             <Route path="past-trainings" element={<PastTrainings />} />
             <Route path="document/:id" element={<DocumentView />} />
+          
             <Route path="training/:id" element={<TrainingResults />} />
+            <Route path="trained" element={<Trained />} />
+          
           </Route>
+         
           
           <Route path="*" element={<NotFound />} />
         </Routes>
