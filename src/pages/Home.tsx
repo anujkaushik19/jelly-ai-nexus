@@ -10,7 +10,7 @@ import Footer from "../components/Footer";
 
 const Home = () => {
   useEffect(() => {
-    // Scroll to top when page loads
+    
     window.scrollTo(0, 0);
   }, []);
 
