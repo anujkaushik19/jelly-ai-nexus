@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,13 +16,20 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/");
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex justify-between items-center">
       <div>
         <h1 className="text-2xl font-bold">{title}</h1>
         {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
       </div>
-      
+
       <div className="flex items-center gap-4">
         <Button variant="outline" size="sm" asChild>
           <Link to="/dashboard/help">
@@ -35,7 +41,10 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
             Help
           </Link>
         </Button>
-        
+        <Button onClick={handleLogout} className="cursor-pointer">
+              Sign out
+            </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-9 w-9 rounded-full p-0">
@@ -58,9 +67,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
               <Link to="/dashboard/settings" className="flex w-full">Settings</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Link to="/" className="flex w-full">Sign out</Link>
-            </DropdownMenuItem>
+            
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
