@@ -1,9 +1,26 @@
+<<<<<<< Updated upstream
 import { useEffect } from 'react';
 import { useNavigate, BrowserRouter, Routes, Route } from 'react-router-dom';
+=======
+<<<<<<< Updated upstream
+=======
+import { useEffect } from 'react';
+import {
+  useNavigate,
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
+>>>>>>> Stashed changes
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
 import Home from './pages/Home';
 import DashboardLayout from './components/DashboardLayout';
@@ -19,11 +36,17 @@ import Login from './pages/Login';
 
 const queryClient = new QueryClient();
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 const AppRoutes = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+<<<<<<< Updated upstream
     if (window.location.pathname === '/') {
       navigate(token ? '/dashboard' : '/register');
     }
@@ -32,6 +55,19 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<div />} /> {/* placeholder */}
+=======
+    const publicRoutes = ['/register', '/login'];
+    if (!token && !publicRoutes.includes(window.location.pathname)) {
+      navigate('/register');
+    }
+  }, [navigate]);
+
+  const token = localStorage.getItem('token');
+
+  return (
+    <Routes>
+      <Route path="/" element={token ? <Home /> : <Navigate to="/register" />} />
+>>>>>>> Stashed changes
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
 
@@ -51,6 +87,10 @@ const AppRoutes = () => {
   );
 };
 
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
