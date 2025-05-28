@@ -272,14 +272,7 @@ const Register = () => {
           </Card>
 
           {/* Trust Indicators */}
-          <div className="text-center mt-8 animate-fade-in delay-500">
-            <p className="text-sm text-gray-500 mb-4">Trusted by 10,000+ businesses worldwide</p>
-            <div className="flex justify-center items-center gap-6 opacity-60">
-              <div className="w-16 h-8 bg-gray-300 rounded"></div>
-              <div className="w-16 h-8 bg-gray-300 rounded"></div>
-              <div className="w-16 h-8 bg-gray-300 rounded"></div>
-            </div>
-          </div>
+         
         </div>
       </div>
 
