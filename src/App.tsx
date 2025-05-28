@@ -21,7 +21,6 @@ import PastTrainings from './pages/PastTrainings';
 import NotFound from './pages/NotFound';
 import Trained from './pages/Trained';
 import Register from './pages/Register';
-import Login from './pages/Login';
 
 const queryClient = new QueryClient();
 
@@ -30,7 +29,7 @@ const AppRoutes = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const publicRoutes = ['/register', '/login'];
+    const publicRoutes = ['/register'];
     if (!token && !publicRoutes.includes(window.location.pathname)) {
       navigate('/register');
     }
@@ -45,7 +44,6 @@ const AppRoutes = () => {
         element={token ? <Home /> : <Navigate to="/register" />}
       />
       <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<Login />} />
 
       <Route path="/dashboard" element={<DashboardLayout />}>
         <Route index element={<EntitySets />} />
